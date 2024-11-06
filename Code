@@ -1,0 +1,44 @@
+t1 <- readxl::read_xlsx("count.xlsx")
+kegg <- readxl::read_xlsx('Rh0.1 vs Rh 0 top10 kegg.xlsx')
+
+gene_list <- unique(unlist(strsplit(kegg$Gene_ID, '; ')))
+
+t2 <- t1[t1$Gene_ID %in% gene_list, c(1:7)]
+t2$logfc <- log2(rowSums(t2[5:7])/rowSums(t2[2:4]))
+
+
+gene_log <- data.frame(Id = t2[[1]], logfc = t2[[8]], Label = rep('gene'), name = rep('genes')) %>% 
+  mutate('deg' = 
+           case_when(
+             logfc > 0 ~ 'up',
+             logfc < 0 ~ 'down',
+             T ~ 'other'
+            ))
+keggs <- data.frame('Id' = kegg$ko_ID, logfc = rep('0'), Label = rep('kegg'), 
+                    name = kegg$ko_Annotation, deg = 'other')
+nodes <- rbind(gene_log, keggs)
+
+
+mp <- data.frame()
+for (i in 1:nrow(kegg)) {
+  t11 <- kegg[i,]
+  kegglist <- strsplit(t11$Gene_ID, '; ')
+  m1 <- data.frame('Gene_ID' = rep(t11[[1,1]] ,times = length(kegglist)), 
+                   'KEGG' = kegglist)
+  colnames(m1)[2] <- 'kegg'
+  mp <- rbind(mp, m1)
+}
+edges <- data.frame(Source = mp[[1]], Target = mp[[2]], Weight = rep(1))
+
+goal_ko <- c('ko00620', 'ko00550', 'ko00572', 'ko00571')
+
+unique(edges$Source)
+
+goal_edge <- edges[edges$Source %in% goal_ko,]
+goal_node <- nodes[nodes$Id %in% goal_edge$Target | nodes$Id %in% goal_ko,]
+
+export::table2excel(nodes, file = 'nodes.xlsx')
+export::table2excel(edges, file = 'edges.xlsx')
+
+export::table2excel(goal_node, file = 'goal_node.xlsx')
+export::table2excel(goal_edge, file = 'goal_edge.xlsx')
